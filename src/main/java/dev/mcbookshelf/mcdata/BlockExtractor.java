@@ -1,6 +1,7 @@
 package dev.mcbookshelf.mcdata;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -39,15 +40,20 @@ public class BlockExtractor {
 
     private static JsonObject extractBlockData(Block block) {
         JsonObject data = new JsonObject();
+        JsonArray brightnessArray = new JsonArray();
+        JsonArray brightnessRGBArray = new JsonArray();
         BlockState state = block.defaultBlockState();
         MapColor color = state.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
 
         for (Brightness brightness : Brightness.values()) {
             int baseColor = color.col;
             int modifiedColor = applyBrightness(baseColor, brightness.modifier);
-            data.addProperty(brightness.id, modifiedColor);
+            brightnessArray.add(modifiedColor);
+            brightnessRGBArray.add(getRGBFromColor(modifiedColor));
         }
 
+        data.add("brightness", brightnessArray);
+        data.add("brightness_rbg", brightnessRGBArray);
         return data;
     }
 
@@ -62,4 +68,24 @@ public class BlockExtractor {
 
         return (r << 16) | (g << 8) | b;
     }
+
+    private static JsonArray getBrightnessRGBArray(JsonArray brightnessArray) {
+        JsonArray brightnessRGBArray = new JsonArray();
+
+        for (var element : brightnessArray) {
+            int color = element.getAsInt();
+            brightnessRGBArray.add(getRGBFromColor(color));
+        }
+
+        return brightnessRGBArray;
+    }
+
+    private static JsonArray getRGBFromColor(int color) {
+        JsonArray rgbArray = new JsonArray();
+        rgbArray.add((color >> 16) & 0xFF); // Red
+        rgbArray.add((color >> 8) & 0xFF); // Green
+        rgbArray.add(color & 0xFF); // Blue
+        return rgbArray;
+    }
+
 }
