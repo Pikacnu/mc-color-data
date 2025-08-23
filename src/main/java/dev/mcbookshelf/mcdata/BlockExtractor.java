@@ -3,15 +3,16 @@ package dev.mcbookshelf.mcdata;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.MapColor.Brightness;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,19 +42,35 @@ public class BlockExtractor {
     private static JsonObject extractBlockData(Block block) {
         JsonObject data = new JsonObject();
         JsonArray brightnessArray = new JsonArray();
-        JsonArray brightnessRGBArray = new JsonArray();
         BlockState state = block.defaultBlockState();
         MapColor color = state.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+
+        if(block.getClass() == RotatedPillarBlock.class ) {
+            JsonObject pillarData = new JsonObject();
+            String[] AXIS = {"X", "Y", "Z"};
+            for (String axis : AXIS) {
+                BlockState axisState = state.setValue(RotatedPillarBlock.AXIS, Axis.valueOf(axis));
+                MapColor axisColor = axisState.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+                JsonObject axisData = new JsonObject();
+                JsonArray axisBrightnessArray = new JsonArray();
+                for (Brightness brightness : Brightness.values()) {
+                    int baseColor = axisColor.col;
+                    int modifiedColor = applyBrightness(baseColor, brightness.modifier);
+                    axisBrightnessArray.add(modifiedColor);
+                }
+                axisData.add("brightness", axisBrightnessArray);
+                pillarData.add(axis, axisData);
+            }
+            data.add("properties", pillarData);
+        }
 
         for (Brightness brightness : Brightness.values()) {
             int baseColor = color.col;
             int modifiedColor = applyBrightness(baseColor, brightness.modifier);
             brightnessArray.add(modifiedColor);
-            brightnessRGBArray.add(getRGBFromColor(modifiedColor));
         }
 
         data.add("brightness", brightnessArray);
-        data.add("brightness_rbg", brightnessRGBArray);
         return data;
     }
 
@@ -68,24 +85,4 @@ public class BlockExtractor {
 
         return (r << 16) | (g << 8) | b;
     }
-
-    private static JsonArray getBrightnessRGBArray(JsonArray brightnessArray) {
-        JsonArray brightnessRGBArray = new JsonArray();
-
-        for (var element : brightnessArray) {
-            int color = element.getAsInt();
-            brightnessRGBArray.add(getRGBFromColor(color));
-        }
-
-        return brightnessRGBArray;
-    }
-
-    private static JsonArray getRGBFromColor(int color) {
-        JsonArray rgbArray = new JsonArray();
-        rgbArray.add((color >> 16) & 0xFF); // Red
-        rgbArray.add((color >> 8) & 0xFF); // Green
-        rgbArray.add(color & 0xFF); // Blue
-        return rgbArray;
-    }
-
 }
